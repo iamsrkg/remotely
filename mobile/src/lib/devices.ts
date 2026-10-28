@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 export type Device = {
   id: string;
@@ -12,18 +13,38 @@ export type Device = {
 };
 
 const KEY = 'remotely.devices.v1';
+// Pairing secrets grant full control of a computer, so they live in the OS keychain/keystore,
+// not in plain AsyncStorage. Only non-secret metadata is stored in AsyncStorage.
+const secretKey = (id: string) => `remotely.secret.${id.replace(/[^0-9a-zA-Z]/g, '')}`;
 
 export async function loadDevices(): Promise<Device[]> {
+  let stored: Device[] = [];
   try {
     const raw = await AsyncStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Device[]) : [];
+    stored = raw ? (JSON.parse(raw) as Device[]) : [];
   } catch {
     return [];
   }
+  const out: Device[] = [];
+  let migrated = false;
+  for (const d of stored) {
+    if (d.secret) {
+      // Older versions kept the secret in AsyncStorage: move it to secure storage.
+      await SecureStore.setItemAsync(secretKey(d.id), d.secret);
+      migrated = true;
+      out.push(d);
+      continue;
+    }
+    const secret = await SecureStore.getItemAsync(secretKey(d.id)).catch(() => null);
+    if (secret) out.push({ ...d, secret });
+  }
+  if (migrated) await saveDevices(out);
+  return out;
 }
 
 async function saveDevices(list: Device[]) {
-  await AsyncStorage.setItem(KEY, JSON.stringify(list));
+  for (const d of list) await SecureStore.setItemAsync(secretKey(d.id), d.secret);
+  await AsyncStorage.setItem(KEY, JSON.stringify(list.map((d) => ({ ...d, secret: '' }))));
 }
 
 export async function upsertDevice(d: Device): Promise<Device[]> {
@@ -34,6 +55,7 @@ export async function upsertDevice(d: Device): Promise<Device[]> {
 }
 
 export async function removeDevice(id: string): Promise<Device[]> {
+  await SecureStore.deleteItemAsync(secretKey(id)).catch(() => {});
   const list = (await loadDevices()).filter((x) => x.id !== id);
   await saveDevices(list);
   return list;

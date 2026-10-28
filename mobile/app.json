@@ -54,7 +54,8 @@
           }
         }
       ],
-      "expo-screen-orientation"
+      "expo-screen-orientation",
+      "expo-secure-store"
     ],
     "backgroundColor": "#0f1115"
   }

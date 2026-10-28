@@ -172,6 +172,7 @@ class Session {
     this.screen = this.screens[0] || null;
     this.stream = await captureScreen(this.screen && this.screen.id);
     const track = this.stream.getVideoTracks()[0];
+    this.watchTrack(track);
     await this.pc.setRemoteDescription({ type: 'offer', sdp });
     this.remoteSet = true;
     this.sender = this.pc.addTrack(track, this.stream);
@@ -208,6 +209,10 @@ class Session {
 
   onState(s) {
     this.state = s;
+    if (s === 'connected' && !this.announced) {
+      this.announced = true;
+      window.agent.notify(`${this.device} connected`, 'Your screen is being shared with this phone. Disconnect from the Remotely window or tray.');
+    }
     if (s === 'failed') return endSession(this, 'Connection failed');
     if (s === 'disconnected') {
       clearTimeout(this.dcTimer);
@@ -227,9 +232,37 @@ class Session {
         screen: this.screen,
         cursor: await window.agent.cursor(this.screen && this.screen.displayId),
       });
+      this.startCursorSync();
     };
     ch.onmessage = (e) => this.onInput(e.data);
     ch.onclose = () => endSession(this, `${this.device} disconnected`);
+  }
+
+  // Report cursor moves made on the computer itself so the phone's trackpad cursor stays in sync.
+  startCursorSync() {
+    clearInterval(this.cursorTimer);
+    this.cursorTimer = setInterval(async () => {
+      if (!this.screen) return;
+      const c = await window.agent.cursor(this.screen.displayId);
+      const last = this.lastCursor;
+      if (last && Math.abs(last.x - c.x) < 0.001 && Math.abs(last.y - c.y) < 0.001) return;
+      this.lastCursor = c;
+      this.send({ t: 'cursor', x: c.x, y: c.y });
+    }, 250);
+  }
+
+  // A capture track ends when a monitor is unplugged or its resolution changes; re-capture instead of freezing.
+  watchTrack(track) {
+    track.onended = () => {
+      if (sessions.get(this.sid) !== this) return;
+      this.recoveries = (this.recoveries || 0) + 1;
+      if (this.recoveries > 5) return endSession(this, 'Screen capture stopped');
+      setTimeout(async () => {
+        const list = await window.agent.listScreens();
+        const target = list.find((x) => x.id === (this.screen && this.screen.id)) || list[0];
+        if (target) this.switchScreen(target.id, true);
+      }, 500);
+    };
   }
 
   send(m) {
@@ -266,21 +299,32 @@ class Session {
     }
   }
 
-  async switchScreen(id) {
-    const s = (await window.agent.listScreens()).find((x) => x.id === id);
-    if (!s) return;
-    const stream = await captureScreen(s.id);
-    await this.sender.replaceTrack(stream.getVideoTracks()[0]);
-    this.stream.getTracks().forEach((t) => t.stop());
-    this.stream = stream;
-    this.screen = s;
-    this.send({ t: 'screen', screen: s, cursor: await window.agent.cursor(s.displayId) });
+  async switchScreen(id, recovering) {
+    try {
+      const s = (await window.agent.listScreens()).find((x) => x.id === id);
+      if (!s || sessions.get(this.sid) !== this) return;
+      const stream = await captureScreen(s.id);
+      const track = stream.getVideoTracks()[0];
+      await this.sender.replaceTrack(track);
+      const old = this.stream;
+      this.stream = stream;
+      this.watchTrack(track);
+      if (old) old.getTracks().forEach((t) => ((t.onended = null), t.stop()));
+      this.screen = s;
+      if (!recovering) this.recoveries = 0;
+      this.lastCursor = null;
+      this.send({ t: 'screen', screen: s, screens: await window.agent.listScreens(), cursor: await window.agent.cursor(s.displayId) });
+    } catch (e) {
+      console.error('switchScreen', e);
+      if (recovering) endSession(this, 'Screen capture stopped');
+    }
   }
 
   close() {
     clearTimeout(this.dcTimer);
+    clearInterval(this.cursorTimer);
     this.signal({ kind: 'bye' }).catch(() => {});
-    this.stream && this.stream.getTracks().forEach((t) => t.stop());
+    this.stream && this.stream.getTracks().forEach((t) => ((t.onended = null), t.stop()));
     try {
       this.pc.close();
     } catch {}
@@ -339,8 +383,13 @@ $('reset').onclick = async () => {
 };
 
 $('copy').onclick = () => {
-  navigator.clipboard.writeText(st.code);
-  alertInline('Pairing code copied');
+  const code = st.code;
+  window.agent.clipboardWrite(code);
+  alertInline('Pairing code copied. It gives full control of this computer, so it will be cleared from the clipboard in 60 seconds.');
+  // The code contains the pairing secret; don't leave it in the clipboard.
+  setTimeout(async () => {
+    if ((await window.agent.clipboardRead()) === code) window.agent.clipboardWrite('');
+  }, 60_000);
 };
 
 function alertInline(text) {

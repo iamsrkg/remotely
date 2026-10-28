@@ -53,13 +53,15 @@
       dc.send(JSON.stringify({ t: 'clip-set', s: clipToken }));
       setTimeout(() => dc.send(JSON.stringify({ t: 'clip-get' })), 100);
       dc.send(JSON.stringify({ t: 'ping', ts: Date.now() }));
+    } else if (m.t === 'cursor') {
+      report.cursorUpdates = (report.cursorUpdates || 0) + 1;
     } else if (m.t === 'clip') {
       report.clipboardRoundTrip = m.s === clipToken;
     } else if (m.t === 'pong') {
       report.latencyMs = Date.now() - m.ts;
       setTimeout(async () => (report.cursorAtCheck = await window.harness.cursor()), 150);
       // Give input + video a moment, then report.
-      const wait = () => (report.videoFrames >= 3 && report.cursorAtCheck && report.clipboardRoundTrip !== undefined ? setTimeout(done, 100) : setTimeout(wait, 200));
+      const wait = () => (report.videoFrames >= 3 && report.cursorAtCheck && report.cursorUpdates && report.clipboardRoundTrip !== undefined ? setTimeout(done, 100) : setTimeout(wait, 200));
       wait();
     }
   };

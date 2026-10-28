@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('agent', {
   releaseInput: () => ipcRenderer.send('input:release'),
   clipboardRead: () => ipcRenderer.invoke('clipboard:read'),
   clipboardWrite: (text) => ipcRenderer.send('clipboard:write', text),
+  notify: (title, body) => ipcRenderer.send('notify', title, body),
   setActiveSessions: (n) => ipcRenderer.send('sessions:active', n),
   requestPermission: (kind) => ipcRenderer.invoke('perm:request', kind),
   onStateChanged: (fn) => ipcRenderer.on('state-changed', () => fn()),

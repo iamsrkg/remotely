@@ -36,6 +36,8 @@ export type Events = {
   onScreen: (screen: ScreenInfo, cursor: { x: number; y: number }) => void;
   onLatency: (ms: number) => void;
   onClipboard?: (text: string) => void;
+  /** Cursor moved on the computer itself (normalized to the viewed screen). */
+  onCursor?: (c: { x: number; y: number }) => void;
 };
 
 /** Latest known state, replayed to whichever screen attaches to the session. */
@@ -158,6 +160,10 @@ export class RemoteSession {
       this.listeners.forEach((l) => l.onLatency(ms));
     },
     onClipboard: (text) => this.listeners.forEach((l) => l.onClipboard?.(text)),
+    onCursor: (cur) => {
+      this.snap = { ...this.snap, cursor: cur };
+      this.listeners.forEach((l) => l.onCursor?.(cur));
+    },
   };
 
   constructor(readonly device: Device) {}
@@ -264,7 +270,15 @@ export class RemoteSession {
       return;
     }
     if (m.t === 'hello') this.ev.onHello(m);
-    else if (m.t === 'screen') this.ev.onScreen(m.screen, m.cursor);
+    else if (m.t === 'screen') {
+      // The monitor list can change (monitor plugged/unplugged).
+      if (Array.isArray(m.screens) && this.snap.hello) {
+        const hello = { ...this.snap.hello, screens: m.screens, screen: m.screen, cursor: m.cursor ?? this.snap.cursor };
+        this.snap = { ...this.snap, hello };
+        this.ev.onHello(hello);
+      }
+      this.ev.onScreen(m.screen, m.cursor);
+    } else if (m.t === 'cursor' && typeof m.x === 'number' && typeof m.y === 'number') this.ev.onCursor?.({ x: m.x, y: m.y });
     else if (m.t === 'pong') this.ev.onLatency(Date.now() - m.ts);
     else if (m.t === 'clip' && typeof m.s === 'string') this.ev.onClipboard?.(m.s);
   }

@@ -34,7 +34,7 @@ app.whenReady().then(async () => {
     const target = { x: d.x + 0.25 * d.width, y: d.y + 0.25 * d.height };
     const at = report.cursorAtCheck || after;
     report.cursorMovedToTarget = Math.abs(at.x - target.x) < 4 && Math.abs(at.y - target.y) < 4;
-    const ok = report.signaling && report.answerVerified && report.videoFrames > 0 && report.hello && report.cursorMovedToTarget && report.clipboardRoundTrip &&
+    const ok = report.signaling && report.answerVerified && report.videoFrames > 0 && report.hello && report.cursorMovedToTarget && report.cursorUpdates > 0 && report.clipboardRoundTrip &&
       (!Number(process.env.REMOTELY_HOLD_MS) || report.stillConnectedAfterHold);
     finish(ok ? 0 : 1, report);
   });

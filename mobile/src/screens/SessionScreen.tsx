@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   GestureResponderEvent,
   Keyboard,
+  Platform,
   PanResponder,
   Pressable,
   ScrollView,
@@ -83,6 +84,8 @@ export default function SessionScreen({ device, onExit, keepAlive }: Props) {
     cursor: { x: 0.5, y: 0.5 } as Pt,
     layout: { cw: 0, ch: 0, px: 0, py: 0 },
     screen: { w: 16, h: 9 },
+    touching: false,
+    lastLocalMove: 0,
   });
   r.current.mode = mode;
 
@@ -117,6 +120,13 @@ export default function SessionScreen({ device, onExit, keepAlive }: Props) {
       },
       onScreen: applyScreen,
       onLatency: setLatency,
+      onCursor: (c) => {
+        // Follow mouse moves made on the computer, but never fight the user's own finger.
+        if (r.current.touching || Date.now() - r.current.lastLocalMove < 600) return;
+        const cur = { x: clamp01(c.x), y: clamp01(c.y) };
+        r.current.cursor = cur;
+        setCursor(cur);
+      },
       onClipboard: (text) => {
         Clipboard.setStringAsync(text)
           .then(() => flash(text ? 'Computer clipboard copied to phone' : 'Computer clipboard is empty'))
@@ -179,6 +189,7 @@ export default function SessionScreen({ device, onExit, keepAlive }: Props) {
   }
 
   function setRemoteCursor(n: Pt) {
+    r.current.lastLocalMove = Date.now();
     r.current.cursor = n;
     setCursor(n);
     send({ t: 'move', x: n.x, y: n.y });
@@ -256,6 +267,7 @@ export default function SessionScreen({ device, onExit, keepAlive }: Props) {
         onMoveShouldSetPanResponder: () => true,
         onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: (e) => {
+          r.current.touching = true;
           const t = touches(e);
           g.start = Date.now();
           g.startPts = t;
@@ -334,6 +346,7 @@ export default function SessionScreen({ device, onExit, keepAlive }: Props) {
   );
 
   function finish() {
+    r.current.touching = false;
     clearLong();
     if (g.dragging) {
       send({ t: 'up', b: 'left' });
@@ -537,7 +550,9 @@ export default function SessionScreen({ device, onExit, keepAlive }: Props) {
         autoCorrect={false}
         spellCheck={false}
         autoComplete="off"
-        keyboardType="default"
+        // Android keyboards compose words with suggestions, which garbles text when the field is cleared
+        // after every character; "visible-password" turns composition off.
+        keyboardType={Platform.OS === 'android' ? 'visible-password' : 'default'}
         submitBehavior="submit"
         onChangeText={onText}
         onSubmitEditing={() => sendKey('enter')}

@@ -4,6 +4,7 @@ const {
   app,
   BrowserWindow,
   Menu,
+  Notification,
   Tray,
   clipboard,
   desktopCapturer,
@@ -23,6 +24,8 @@ const { attachRelay } = require('./relay');
 
 if (process.env.REMOTELY_DATA_DIR) app.setPath('userData', process.env.REMOTELY_DATA_DIR);
 if (!app.requestSingleInstanceLock()) app.quit();
+// Needed for Windows toast notifications.
+if (process.platform === 'win32') app.setAppUserModelId('com.remotely.desktop');
 
 let win = null;
 let tray = null;
@@ -214,6 +217,9 @@ app.whenReady().then(() => {
   ipcMain.on('input:release', () => input.releaseAll());
   ipcMain.handle('clipboard:read', async () => String((await clipboard.readText()) ?? '').slice(0, 100_000));
   ipcMain.on('clipboard:write', (_e, text) => typeof text === 'string' && clipboard.writeText(text.slice(0, 100_000)));
+  ipcMain.on('notify', (_e, title, body) => {
+    if (Notification.isSupported()) new Notification({ title: String(title).slice(0, 100), body: String(body).slice(0, 200) }).show();
+  });
   ipcMain.on('sessions:active', (_e, n) => {
     activeSessions = Number(n) || 0;
     // Keep the computer awake while a phone is connected.
