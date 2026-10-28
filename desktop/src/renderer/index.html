@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src ws: wss:"
+    />
+    <title>Remotely</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Remotely</h1>
+      <p class="muted">Scan with the Remotely phone app to control this computer.</p>
+    </header>
+
+    <section class="card" id="session-card">
+      <strong id="session"></strong>
+      <ul id="session-list"></ul>
+    </section>
+
+    <section class="card" id="perms" hidden>
+      <strong>Permissions needed</strong>
+      <p class="muted">macOS requires these so your phone can see and control the screen. Restart Remotely after granting.</p>
+      <div id="perm-buttons" class="stack"></div>
+    </section>
+
+    <section class="card center">
+      <img id="qr" alt="Pairing QR code" width="240" height="240" />
+      <div class="label">Device ID</div>
+      <div id="device-id" class="mono big"></div>
+      <button id="copy" class="link">Copy pairing code</button>
+    </section>
+
+    <section class="card">
+      <strong>Connections</strong>
+      <ul id="conns"></ul>
+      <div class="label">LAN address</div>
+      <div id="lan" class="mono"></div>
+    </section>
+
+    <section class="card stack">
+      <strong>Settings</strong>
+      <label>Computer name <input id="name" maxlength="64" /></label>
+      <label>Signaling server (for internet access)
+        <input id="server" placeholder="wss://remotely.example.com" spellcheck="false" />
+      </label>
+      <label class="check"><input type="checkbox" id="autostart" /> Start Remotely when I log in (installed app only)</label>
+      <div class="row">
+        <button id="save">Save</button>
+        <button id="reset" class="danger">Unpair all phones</button>
+      </div>
+      <div id="msg" class="muted"></div>
+    </section>
+
+    <script src="protocol.js"></script>
+    <script src="signaling.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

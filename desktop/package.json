@@ -1,0 +1,76 @@
+{
+  "name": "remotely-desktop",
+  "version": "1.0.0",
+  "description": "Remotely desktop agent",
+  "main": "src/main/main.js",
+  "scripts": {
+    "prestart": "node scripts/copy-relay.js",
+    "start": "electron .",
+    "predist": "node scripts/copy-relay.js",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "e2e": "electron test/controller-main.js",
+    "test:e2e": "node test/run-all.js",
+    "test:e2e:packaged": "node test/run-all.js --packaged"
+  },
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@nut-tree-fork/nut-js": "^4.2.6",
+    "qrcode": "^1.5.4",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "electron": "^45.1.0",
+    "electron-builder": "^26.18.0"
+  },
+  "productName": "Remotely",
+  "build": {
+    "appId": "com.remotely.desktop",
+    "productName": "Remotely",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/@nut-tree-fork/**"
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSScreenCaptureUsageDescription": "Remotely streams your screen to your paired phone."
+      }
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    }
+  }
+}

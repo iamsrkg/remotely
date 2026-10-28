@@ -1,0 +1,18 @@
+{
+  "name": "remotely-server",
+  "version": "1.0.0",
+  "description": "Remotely signaling relay",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --test"
+  },
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "ws": "^8.22.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
