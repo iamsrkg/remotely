@@ -1,0 +1,113 @@
+name: Build all apps
+
+# Builds installers for all four devices. Download them from the run's "Artifacts" section.
+#   Windows .exe, Mac .dmg  -> unsigned desktop installers
+#   Android .apk            -> sideload directly
+#   iPhone .ipa (unsigned)  -> sign + install with a free Apple ID (Sideloadly / AltStore / Xcode)
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      # Unsigned builds unless signing secrets are configured (see HANDOFF.md).
+      # An empty CSC_LINK makes electron-builder fail, so only export it when set.
+      - name: Configure code signing
+        shell: bash
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: |
+          if [ -n "$CSC_LINK" ]; then
+            echo "CSC_LINK=$CSC_LINK" >> "$GITHUB_ENV"
+            echo "CSC_KEY_PASSWORD=$CSC_KEY_PASSWORD" >> "$GITHUB_ENV"
+          else
+            echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "$GITHUB_ENV"
+          fi
+      - name: Build installer
+        run: npm run dist -- --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: remotely-${{ matrix.os == 'windows-latest' && 'windows' || 'mac' }}
+          path: |
+            desktop/dist/*.exe
+            desktop/dist/*.dmg
+          if-no-files-found: error
+
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: npm ci
+      - name: Generate native project
+        run: npx expo prebuild --platform android --clean --no-install
+      - name: Build APK
+        # Release build signed with the debug key: fine for installing on your own phone.
+        run: cd android && ./gradlew assembleRelease --no-daemon
+      - run: cp android/app/build/outputs/apk/release/app-release.apk Remotely.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: remotely-android
+          path: mobile/Remotely.apk
+          if-no-files-found: error
+
+  ios:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Generate native project
+        run: npx expo prebuild --platform ios --clean
+      - name: Build unsigned app
+        run: |
+          xcodebuild \
+            -workspace ios/Remotely.xcworkspace \
+            -scheme Remotely \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            | tail -50
+          test -d build/Build/Products/Release-iphoneos/Remotely.app
+      - name: Package .ipa
+        run: |
+          mkdir Payload
+          cp -R build/Build/Products/Release-iphoneos/Remotely.app Payload/
+          zip -qry Remotely-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: remotely-iphone-unsigned
+          path: mobile/Remotely-unsigned.ipa
+          if-no-files-found: error
