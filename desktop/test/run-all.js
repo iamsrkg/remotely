@@ -2,6 +2,7 @@
 // then runs two simulated phones at the same time (one over LAN, one over the server).
 //   node test/run-all.js            # test the dev app
 //   node test/run-all.js --packaged # test dist/win-unpacked/Remotely.exe (or the mac .app)
+//   REMOTELY_APP=/path/to/Remotely.exe node test/run-all.js   # test any built copy
 // Note: it moves your mouse to 25%/25% of the main screen and briefly uses the clipboard (restored after).
 const { spawn } = require('child_process');
 const fs = require('fs');
@@ -33,6 +34,8 @@ const get = (port) =>
   new Promise((resolve) => http.get({ host: '127.0.0.1', port, timeout: 1000 }, (r) => resolve(r.statusCode)).on('error', () => resolve(0)));
 
 function agentCommand() {
+  // REMOTELY_APP=<path to Remotely.exe or the .app's MacOS/Remotely> tests any built copy.
+  if (process.env.REMOTELY_APP) return [process.env.REMOTELY_APP, []];
   if (!process.argv.includes('--packaged')) return [electron, ['.']];
   const win = path.join(root, 'dist/win-unpacked/Remotely.exe');
   const mac = ['dist/mac-arm64', 'dist/mac'].map((d) => path.join(root, d, 'Remotely.app/Contents/MacOS/Remotely')).find(fs.existsSync);
