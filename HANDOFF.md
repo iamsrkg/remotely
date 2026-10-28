@@ -25,8 +25,8 @@ be connected to the same computer at the same time.
 | Two phones on one computer at once | ✅ E2E-tested |
 | Clipboard sync (both directions) | ✅ E2E-tested (agent side) |
 | Signed handshake / forged-offer rejection | ✅ E2E-tested |
-| Mac agent | ⚠️ Code complete, **never run on a Mac**. CI workflow builds the `.dmg` on `macos-latest` |
-| Phone app (iOS + Android) | ⚠️ Code complete and type-checks (`tsc` clean, `expo-doctor` 19/20). **Never built or run on a device** — this PC has no Android SDK/Xcode |
+| Mac agent | ⚠️ `.dmg` builds in CI, **never run on a Mac** |
+| Phone app (iOS + Android) | ⚠️ APK + unsigned IPA build in CI. **Never run on a device yet** |
 | TURN relay | ❌ Not set up. Needed for strict NATs / mobile data (see §5) |
 | Code signing (Windows/macOS), App Store / Play Store | ❌ Not done |
 
@@ -71,6 +71,20 @@ be connected to the same computer at the same time.
 | `mobile/src/screens/AllScreen.tsx` | Live overview of all computers |
 
 ## 4. Getting it onto all four devices
+
+### Easiest: download the prebuilt files (free, personal use)
+GitHub → **Actions → Build all apps → latest run → Artifacts** (or *Run workflow* to build fresh). You get:
+
+| Artifact | Install |
+|---|---|
+| `remotely-windows` (.exe) | Run it → SmartScreen *More info → Run anyway* |
+| `remotely-mac` (.dmg) | Drag to Applications → open → System Settings → Privacy & Security → *Open Anyway* → grant Screen Recording + Accessibility |
+| `remotely-android` (.apk) | Copy to phone, open, allow "install unknown apps" |
+| `remotely-iphone-unsigned` (.ipa) | Sign with a **free Apple ID** using Sideloadly or AltStore (Mac or Windows), or Xcode. Free signing expires every 7 days — re-sign to refresh |
+
+No developer subscription is needed for any of these. The paid Apple account only removes the 7-day limit.
+
+### Building yourself
 
 ### Windows PC
 ```bash
